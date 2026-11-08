@@ -151,7 +151,7 @@ function renderEditor(){
   <label><input type="checkbox" id="yr" ${yearly?"checked":""}> Повторять каждый год</label>
   <div class="row"><button class="pri" id="save">${cur?"Сохранить":"Добавить"}</button>${cur?'<button id="cancel">Отмена</button>':""}</div>
   ${L.length?'<button id="icsday" style="width:100%;margin-top:8px">📅 Этот день в календарь (.ics)</button>':""}
-  <p class="hint">Можно добавить несколько человек на один день. 📱 открывает календарь телефона, 🔔 открывает Google Календарь, а «.ics» подходит для любого календаря.</p>`;
+  <p class="hint">Можно добавить несколько человек на один день. 📱 скачивает файл для календаря телефона (.ics), 🔔 открывает Google Календарь, а «.ics» подходит для любого календаря.</p>`;
   document.getElementById("save").onclick=()=>{
     const t=document.getElementById("txt").value.trim(); if(!t)return;
     const b=parseInt(document.getElementById("by").value)||0;
@@ -169,11 +169,7 @@ function renderEditor(){
     else{drop(r.k,r.i);edit=null;persist();render()}
   });
 }
-function phoneCal(r){
-  if(!/Android/i.test(navigator.userAgent)){downloadIcs([[r.k,r.e,r.i]]);return}
-  const a=Date.UTC(sel.y,sel.m,sel.d),b=a+864e5;
-  location.href="intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event;S.title="+encodeURIComponent("🎂 "+r.e.t)+";l.beginTime="+a+";l.endTime="+b+";B.allDay=true;"+(r.k.length===5?"S.rrule="+encodeURIComponent("FREQ=YEARLY")+";":"")+"end";
-}
+function phoneCal(r){downloadIcs([[r.k,r.e,r.i]])}
 function render(){renderBanner();renderGrid();renderEditor()}
 document.getElementById("prev").onclick=()=>{view.m--;if(view.m<0){view.m=11;view.y--}renderGrid()};
 document.getElementById("next").onclick=()=>{view.m++;if(view.m>11){view.m=0;view.y++}renderGrid()};
