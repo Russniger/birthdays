@@ -19,7 +19,7 @@ h1{font-size:20px;margin:4px 0 12px}
 .banner b{display:block;margin-bottom:2px}
 .up{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--bd);cursor:pointer}
 .up:first-of-type{border-top:0}
-.up span:last-child{color:var(--mu);white-space:nowrap}
+.up>span:last-child{color:var(--mu);white-space:nowrap}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px;margin-bottom:12px}
 .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .nav b{font-size:17px}
@@ -45,6 +45,13 @@ label{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .mini{padding:4px 8px;font-size:16px;margin-left:4px}
 a.mini{display:inline-block;text-decoration:none;color:var(--tx);border:1px solid var(--bd);border-radius:12px;background:var(--card)}
 .hint{color:var(--mu);font-size:13px;margin:8px 0 0}
+.who{display:flex;align-items:center;gap:10px}
+.av{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;background:var(--bd)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.ovc{background:var(--card);border-radius:16px;padding:16px;width:min(320px,100%);text-align:center}
+.crop{width:240px;height:240px;margin:12px auto;border-radius:50%;overflow:hidden;position:relative;touch-action:none;background:#000;border:2px solid var(--ac)}
+.crop img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.ovc input[type=range]{width:100%}
 </style>
 </head>
 <body>
@@ -78,7 +85,7 @@ try{
   const raw=JSON.parse(localStorage.getItem("bd-notes")||"{}");
   for(const k in raw){
     if(!KEYRE.test(k))continue;
-    const a=(Array.isArray(raw[k])?raw[k]:[raw[k]]).filter(e=>e&&e.t).map(e=>({t:e.t,by:+e.by||0}));
+    const a=(Array.isArray(raw[k])?raw[k]:[raw[k]]).filter(e=>e&&e.t).map(e=>({t:e.t,by:+e.by||0,p:typeof e.p==="string"&&e.p.startsWith("data:image/")?e.p:""}));
     if(a.length)notes[k]=a;
   }
 }catch(e){notes={}}
@@ -98,7 +105,7 @@ function upcoming(){
     if(k.length===5){m=+k.slice(0,2)-1;d=+k.slice(3);y=today.y;if(Date.UTC(y,m,d)<t0())y++}
     else{y=+k.slice(0,4);m=+k.slice(5,7)-1;d=+k.slice(8)}
     const diff=Math.round((Date.UTC(y,m,d)-t0())/864e5);
-    if(diff>=0&&diff<=60)notes[k].forEach(e=>out.push({y,m,d,diff,t:e.t,by:e.by}));
+    if(diff>=0&&diff<=60)notes[k].forEach(e=>out.push({y,m,d,diff,t:e.t,by:e.by,p:e.p}));
   }
   return out.sort((a,b)=>a.diff-b.diff).slice(0,8);
 }
@@ -108,7 +115,7 @@ function renderBanner(){
   const when=n=>n===0?"сегодня":n===1?"завтра":`через ${n} дн.`;
   const head=u[0].diff===0?"🎉 Сегодня день рождения!":"Ближайшие даты";
   el.innerHTML=`<div class="banner"><b>${head}</b>`+u.map((x,i)=>
-    `<div class="up" data-i="${i}"><span>${esc(x.t)}${x.by?` · ${x.y-x.by} ${yw(x.y-x.by)}`:""}</span><span>${x.d} ${MG[x.m]}, ${when(x.diff)}</span></div>`).join("")+`</div>`;
+    `<div class="up" data-i="${i}"><span class="who">${x.p?`<img class="av" src="${x.p}" alt="">`:""}<span>${esc(x.t)}${x.by?` · ${x.y-x.by} ${yw(x.y-x.by)}`:""}</span></span><span>${x.d} ${MG[x.m]}, ${when(x.diff)}</span></div>`).join("")+`</div>`;
   el.querySelectorAll(".up").forEach(n=>n.onclick=()=>{
     const x=u[+n.dataset.i]; view={y:x.y,m:x.m}; sel={y:x.y,m:x.m,d:x.d}; edit=null; render();
   });
@@ -139,15 +146,17 @@ function renderEditor(){
   const L=dayList(sel.y,sel.m,sel.d), el=document.getElementById("editor");
   const cur=edit&&notes[edit.k]?notes[edit.k][edit.i]:null;
   const yearly=edit?edit.k.length===5:true;
+  let photo=cur&&cur.p?cur.p:"";
   const ds=`${sel.y}${p2(sel.m+1)}${p2(sel.d)}`;
   const en=new Date(Date.UTC(sel.y,sel.m,sel.d+1)).toISOString().slice(0,10).replace(/-/g,"");
   const gl=r=>"https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("🎂 "+r.e.t)+"&dates="+ds+"/"+en+(r.k.length===5?"&recur="+encodeURIComponent("RRULE:FREQ=YEARLY"):"");
   const rows=L.map((r,j)=>{const a=ageLine(r.e);
-    return `<div class="ent"><span>${esc(r.e.t)}${a?`<br><small class="ag">🎂 ${a}</small>`:""}</span><span class="acts"><button class="mini" data-a="p" data-j="${j}" title="Календарь телефона">📱</button><a class="mini" target="_blank" rel="noopener" href="${gl(r)}" title="Google Календарь">🔔</a><button class="mini" data-a="e" data-j="${j}">✏️</button><button class="mini" data-a="d" data-j="${j}">🗑</button></span></div>`}).join("");
+    return `<div class="ent"><span class="who">${r.e.p?`<img class="av" src="${r.e.p}" alt="">`:""}<span>${esc(r.e.t)}${a?`<br><small class="ag">🎂 ${a}</small>`:""}</span></span><span class="acts"><button class="mini" data-a="p" data-j="${j}" title="Календарь телефона">📱</button><a class="mini" target="_blank" rel="noopener" href="${gl(r)}" title="Google Календарь">🔔</a><button class="mini" data-a="e" data-j="${j}">✏️</button><button class="mini" data-a="d" data-j="${j}">🗑</button></span></div>`}).join("");
   el.innerHTML=`<b>${sel.d} ${MG[sel.m]} ${sel.y}</b>${rows}
   <p class="hint" style="margin-top:12px">${cur?"Редактирование":"Добавить человека"}</p>
   <input type="text" id="txt" placeholder="Например: День рождения Ивана" value="${cur?esc(cur.t):""}">
   <label>Год рождения (необязательно) <input id="by" type="number" inputmode="numeric" min="1900" max="2100" placeholder="1990" value="${cur&&cur.by?cur.by:""}"></label>
+  <div class="who" style="margin-bottom:10px"><img class="av" id="pv" ${photo?`src="${photo}"`:"hidden"} alt=""><button type="button" id="pickph">📷 Фото</button><button type="button" id="rmph" ${photo?"":"hidden"}>Убрать</button><input type="file" id="ph" accept="image/*" hidden></div>
   <label><input type="checkbox" id="yr" ${yearly?"checked":""}> Повторять каждый год</label>
   <div class="row"><button class="pri" id="save">${cur?"Сохранить":"Добавить"}</button>${cur?'<button id="cancel">Отмена</button>':""}</div>
   ${L.length?'<button id="icsday" style="width:100%;margin-top:8px">📅 Этот день в календарь (.ics)</button>':""}
@@ -157,8 +166,18 @@ function renderEditor(){
     const b=parseInt(document.getElementById("by").value)||0;
     const key=document.getElementById("yr").checked?md(sel.m,sel.d):full(sel.y,sel.m,sel.d);
     if(cur)drop(edit.k,edit.i);
-    (notes[key]=notes[key]||[]).push({t,by:(b>=1900&&b<=today.y)?b:0});
+    (notes[key]=notes[key]||[]).push({t,by:(b>=1900&&b<=today.y)?b:0,p:photo});
     edit=null;persist();render();
+  };
+  const ph=document.getElementById("ph"),pv=document.getElementById("pv"),rm=document.getElementById("rmph");
+  document.getElementById("pickph").onclick=()=>ph.click();
+  rm.onclick=()=>{photo="";pv.hidden=true;rm.hidden=true;ph.value=""};
+  ph.onchange=()=>{
+    const f=ph.files[0];if(!f)return;
+    const img=new Image(),u=URL.createObjectURL(f);
+    img.onload=()=>{cropper(img,res=>{photo=res;pv.src=photo;pv.hidden=false;rm.hidden=false});URL.revokeObjectURL(u);ph.value=""};
+    img.onerror=()=>URL.revokeObjectURL(u);
+    img.src=u;
   };
   const cn=document.getElementById("cancel"); if(cn)cn.onclick=()=>{edit=null;renderEditor()};
   const di=document.getElementById("icsday"); if(di)di.onclick=()=>downloadIcs(L.map(r=>[r.k,r.e,r.i]));
@@ -170,6 +189,29 @@ function renderEditor(){
   });
 }
 function phoneCal(r){downloadIcs([[r.k,r.e,r.i]])}
+function cropper(img,done){
+  const S=240,W=img.naturalWidth,H=img.naturalHeight,base=S/Math.min(W,H);
+  let z=1,ox=(S-W*base)/2,oy=H>W?-(H*base-S)*0.25:(S-H*base)/2;
+  const o=document.createElement("div");o.className="ov";
+  o.innerHTML=`<div class="ovc"><b>Подгони фото</b><div class="crop"></div><input type="range" min="1" max="4" step="0.01" value="1"><p class="hint">Перетащи фото пальцем, масштаб меняй ползунком</p><div class="row"><button class="pri" id="cok">Готово</button><button id="ccl">Отмена</button></div></div>`;
+  const box=o.querySelector(".crop");box.appendChild(img);
+  const fix=()=>{const k=base*z;ox=Math.min(0,Math.max(S-W*k,ox));oy=Math.min(0,Math.max(S-H*k,oy));
+    img.style.width=W*k+"px";img.style.height=H*k+"px";img.style.left=ox+"px";img.style.top=oy+"px"};
+  fix();
+  const rg=o.querySelector("input");
+  rg.oninput=()=>{const k0=base*z,cx=(S/2-ox)/k0,cy=(S/2-oy)/k0;z=+rg.value;const k=base*z;ox=S/2-cx*k;oy=S/2-cy*k;fix()};
+  let sx=0,sy=0,dr=false;
+  box.onpointerdown=e=>{dr=true;sx=e.clientX-ox;sy=e.clientY-oy;box.setPointerCapture(e.pointerId)};
+  box.onpointermove=e=>{if(!dr)return;ox=e.clientX-sx;oy=e.clientY-sy;fix()};
+  box.onpointerup=box.onpointercancel=()=>{dr=false};
+  o.querySelector("#ccl").onclick=()=>o.remove();
+  o.querySelector("#cok").onclick=()=>{
+    const k=base*z,c=document.createElement("canvas");c.width=c.height=160;
+    c.getContext("2d").drawImage(img,-ox/k,-oy/k,S/k,S/k,0,0,160,160);
+    done(c.toDataURL("image/jpeg",0.8));o.remove();
+  };
+  document.body.appendChild(o);
+}
 function render(){renderBanner();renderGrid();renderEditor()}
 document.getElementById("prev").onclick=()=>{view.m--;if(view.m<0){view.m=11;view.y--}renderGrid()};
 document.getElementById("next").onclick=()=>{view.m++;if(view.m>11){view.m=0;view.y++}renderGrid()};
@@ -215,7 +257,7 @@ document.getElementById("imp").onclick=()=>{
       (Array.isArray(data[k])?data[k]:[data[k]]).forEach(e=>{
         if(!e||typeof e.t!=="string"||!e.t)return;
         const by=+e.by||0, a=notes[k]=notes[k]||[];
-        if(!a.some(x=>x.t===e.t&&x.by===by)){a.push({t:e.t,by});n++}
+        if(!a.some(x=>x.t===e.t&&x.by===by)){a.push({t:e.t,by,p:typeof e.p==="string"&&e.p.startsWith("data:image/")?e.p:""});n++}
       });
     }
     persist();render();msg.textContent="Импортировано записей: "+n+".";
