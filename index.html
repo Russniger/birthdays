@@ -37,6 +37,7 @@ label{display:flex;gap:8px;align-items:center;margin-bottom:10px}
 .row>*{flex:1}
 a.btn{display:block;text-align:center;text-decoration:none;color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
 .hint{color:var(--mu);font-size:13px;margin:8px 0 0}
+input[type=number]{width:110px;padding:8px;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px}
 .top{display:flex;align-items:center;justify-content:space-between}
 .top button{padding:6px 12px;font-size:18px}
 </style>
@@ -63,6 +64,7 @@ const MONTHS=["Январь","Февраль","Март","Апрель","Май"
 const MG=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const WD=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const p2=n=>String(n).padStart(2,"0");
+const yw=n=>(n%10===1&&n%100!==11)?"год":([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))?"года":"лет";
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let notes={};
 try{notes=JSON.parse(localStorage.getItem("bd-notes")||"{}")}catch(e){notes={}}
@@ -82,7 +84,7 @@ function upcoming(){
       if(Date.UTC(y,m,d)<t0)y++;
     }else{y=+k.slice(0,4);m=+k.slice(5,7)-1;d=+k.slice(8);}
     const diff=Math.round((Date.UTC(y,m,d)-t0)/864e5);
-    if(diff>=0&&diff<=60)out.push({y,m,d,diff,t:notes[k].t});
+    if(diff>=0&&diff<=60)out.push({y,m,d,diff,t:notes[k].t,by:notes[k].by||0});
   }
   return out.sort((a,b)=>a.diff-b.diff).slice(0,6);
 }
@@ -92,7 +94,7 @@ function renderBanner(){
   const when=n=>n===0?"сегодня":n===1?"завтра":`через ${n} дн.`;
   const head=u[0].diff===0?"🎉 Сегодня день рождения!":"Ближайшие даты";
   el.innerHTML=`<div class="banner"><b>${head}</b>`+u.map((x,i)=>
-    `<div class="up" data-i="${i}"><span>${esc(x.t.split("\n")[0])}</span><span>${x.d} ${MG[x.m]}, ${when(x.diff)}</span></div>`).join("")+`</div>`;
+    `<div class="up" data-i="${i}"><span>${esc(x.t.split("\n")[0])}${x.by?` · ${x.y-x.by} ${yw(x.y-x.by)}`:""}</span><span>${x.d} ${MG[x.m]}, ${when(x.diff)}</span></div>`).join("")+`</div>`;
   el.querySelectorAll(".up").forEach(n=>n.onclick=()=>{
     const x=u[+n.dataset.i]; view={y:x.y,m:x.m}; sel={y:x.y,m:x.m,d:x.d}; render();
   });
@@ -115,12 +117,19 @@ function renderGrid(){
 }
 function renderEditor(){
   const n=get(sel.y,sel.m,sel.d)||{t:"",y:true};
+  let age="";
+  if(n.by&&sel.y-n.by>=0){
+    const a=sel.y-n.by,c=Date.UTC(sel.y,sel.m,sel.d)-Date.UTC(today.y,today.m,today.d);
+    age=`🎂 ${c<0?"Исполнилось":c===0?"Сегодня исполняется":"Исполнится"} ${a} ${yw(a)}`;
+  }
   const e=document.getElementById("editor");
   const ds=`${sel.y}${p2(sel.m+1)}${p2(sel.d)}`;
   const end=new Date(Date.UTC(sel.y,sel.m,sel.d+1)).toISOString().slice(0,10).replace(/-/g,"");
   const link="https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("🎂 "+(n.t.split("\n")[0]||"День рождения"))+"&dates="+ds+"/"+end+"&recur="+encodeURIComponent("RRULE:FREQ=YEARLY");
   e.innerHTML=`<b>${sel.d} ${MG[sel.m]} ${sel.y}</b>
   <textarea id="txt" placeholder="Например: День рождения Ивана">${esc(n.t)}</textarea>
+  <label>Год рождения (необязательно) <input id="by" type="number" inputmode="numeric" min="1900" max="2100" placeholder="1990" value="${n.by||""}"></label>
+  ${age?`<p style="font-weight:700;color:var(--ac);margin:0 0 10px">${age}</p>`:""}
   <label><input type="checkbox" id="yr" ${n.y?"checked":""}> Повторять каждый год</label>
   <div class="row"><button class="pri" id="save">Сохранить</button><button id="del">Удалить</button></div>
   ${n.t?`<div class="row" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="${link}">🔔 Google Календарь</a><button id="ics">📅 Другой календарь (.ics)</button></div>`:""}
@@ -129,7 +138,8 @@ function renderEditor(){
   document.getElementById("save").onclick=()=>{
     const t=document.getElementById("txt").value.trim(), y=document.getElementById("yr").checked;
     clear();
-    if(t)notes[y?md(sel.m,sel.d):full(sel.y,sel.m,sel.d)]={t,y};
+    const by=parseInt(document.getElementById("by").value)||0;
+    if(t)notes[y?md(sel.m,sel.d):full(sel.y,sel.m,sel.d)]={t,y,by:(by>=1900&&by<=today.y)?by:0};
     persist();render();
   };
   document.getElementById("del").onclick=()=>{clear();persist();render()};
@@ -175,7 +185,7 @@ document.getElementById("exp").onclick=()=>{
 document.getElementById("imp").onclick=()=>{
   try{
     const data=JSON.parse(bk.value.trim());let n=0;
-    for(const k in data){if(/^(\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/.test(k)&&data[k]&&typeof data[k].t==="string"){notes[k]={t:data[k].t,y:!!data[k].y};n++}}
+    for(const k in data){if(/^(\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/.test(k)&&data[k]&&typeof data[k].t==="string"){notes[k]={t:data[k].t,y:!!data[k].y,by:+data[k].by||0};n++}}
     persist();render();msg.textContent="Импортировано записей: "+n+".";
   }catch(e){msg.textContent="Не получилось прочитать текст. Вставь его целиком, как скопировал."}
 };
