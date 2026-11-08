@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Дни рождения</title>
+<style>
+:root{--hasbg:#ffd3b0;--bg:#faf8f4;--card:#fff;--tx:#1f1d1a;--mu:#76716a;--ac:#d9480f;--ac2:#ffe9dd;--bd:#e6e1d8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--hasbg:#6a3b1f;--bg:#171615;--card:#232120;--tx:#f1eee8;--mu:#a29c92;--ac:#ff8a4c;--ac2:#3a2a20;--bd:#37332f;color-scheme:dark}}
+:root[data-theme="dark"]{--hasbg:#6a3b1f;--bg:#171615;--card:#232120;--tx:#f1eee8;--mu:#a29c92;--ac:#ff8a4c;--ac2:#3a2a20;--bd:#37332f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:480px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0 12px}
+.banner{background:var(--ac2);border:1px solid var(--ac);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.banner b{display:block;margin-bottom:2px}
+.up{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--bd);cursor:pointer}
+.up:first-of-type{border-top:0}
+.up span:last-child{color:var(--mu);white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px;margin-bottom:12px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.nav b{font-size:17px}
+.nav button{width:42px;height:42px;font-size:20px}
+button{font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 14px;cursor:pointer}
+button.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.wd{color:var(--mu);font-size:12px;padding:4px 0}
+.d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:12px;position:relative;cursor:pointer;border:1px solid transparent}
+.d.today{border-color:var(--ac);color:var(--ac);font-weight:700}
+.d.sel{background:var(--ac);color:#fff;border-color:var(--ac)}
+.d.has{background:var(--hasbg);font-weight:700}
+.d.sel.has{background:var(--ac);color:#fff}
+textarea{width:100%;min-height:96px;margin:8px 0;padding:10px;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:12px;resize:vertical}
+label{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+a.btn{display:block;text-align:center;text-decoration:none;color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
+.hint{color:var(--mu);font-size:13px;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎂 Дни рождения</h1>
+  <div id="banner"></div>
+  <div class="card">
+    <div class="nav"><button id="prev">‹</button><b id="title"></b><button id="next">›</button></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="card" id="editor"></div>
+  <div class="card">
+    <b>Резервная копия</b>
+    <textarea id="bk" placeholder="Здесь появится текст копии. Для импорта вставь его сюда."></textarea>
+    <div class="row"><button id="exp">Экспорт</button><button id="imp">Импорт</button></div>
+    <p class="hint" id="bkmsg">Экспорт копирует все заметки текстом: сохрани его в «Заметки» или отправь себе. Импорт добавляет заметки из вставленного текста.</p>
+  </div>
+</div>
+<script>
+const MONTHS=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const MG=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const WD=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+const p2=n=>String(n).padStart(2,"0");
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let notes={};
+try{notes=JSON.parse(localStorage.getItem("bd-notes")||"{}")}catch(e){notes={}}
+function persist(){try{localStorage.setItem("bd-notes",JSON.stringify(notes))}catch(e){}}
+const now=new Date();
+const today={y:now.getFullYear(),m:now.getMonth(),d:now.getDate()};
+let view={y:today.y,m:today.m}, sel={...today};
+const full=(y,m,d)=>`${y}-${p2(m+1)}-${p2(d)}`;
+const md=(m,d)=>`${p2(m+1)}-${p2(d)}`;
+const get=(y,m,d)=>notes[full(y,m,d)]||notes[md(m,d)]||null;
+
+function upcoming(){
+  const t0=Date.UTC(today.y,today.m,today.d), out=[];
+  for(const k in notes){
+    let y,m,d;
+    if(k.length===5){m=+k.slice(0,2)-1;d=+k.slice(3);y=today.y;
+      if(Date.UTC(y,m,d)<t0)y++;
+    }else{y=+k.slice(0,4);m=+k.slice(5,7)-1;d=+k.slice(8);}
+    const diff=Math.round((Date.UTC(y,m,d)-t0)/864e5);
+    if(diff>=0&&diff<=60)out.push({y,m,d,diff,t:notes[k].t});
+  }
+  return out.sort((a,b)=>a.diff-b.diff).slice(0,6);
+}
+function renderBanner(){
+  const u=upcoming(); const el=document.getElementById("banner");
+  if(!u.length){el.innerHTML="";return}
+  const when=n=>n===0?"сегодня":n===1?"завтра":`через ${n} дн.`;
+  const head=u[0].diff===0?"🎉 Сегодня день рождения!":"Ближайшие даты";
+  el.innerHTML=`<div class="banner"><b>${head}</b>`+u.map((x,i)=>
+    `<div class="up" data-i="${i}"><span>${esc(x.t.split("\n")[0])}</span><span>${x.d} ${MG[x.m]}, ${when(x.diff)}</span></div>`).join("")+`</div>`;
+  el.querySelectorAll(".up").forEach(n=>n.onclick=()=>{
+    const x=u[+n.dataset.i]; view={y:x.y,m:x.m}; sel={y:x.y,m:x.m,d:x.d}; render();
+  });
+}
+function renderGrid(){
+  document.getElementById("title").textContent=`${MONTHS[view.m]} ${view.y}`;
+  const first=(new Date(view.y,view.m,1).getDay()+6)%7;
+  const days=new Date(view.y,view.m+1,0).getDate();
+  let h=WD.map(w=>`<div class="wd">${w}</div>`).join("");
+  for(let i=0;i<first;i++)h+="<div></div>";
+  for(let d=1;d<=days;d++){
+    const c=["d"];
+    if(view.y===today.y&&view.m===today.m&&d===today.d)c.push("today");
+    if(view.y===sel.y&&view.m===sel.m&&d===sel.d)c.push("sel");
+    if(get(view.y,view.m,d))c.push("has");
+    h+=`<div class="${c.join(" ")}" data-d="${d}">${d}</div>`;
+  }
+  const g=document.getElementById("grid"); g.innerHTML=h;
+  g.querySelectorAll(".d").forEach(n=>n.onclick=()=>{sel={y:view.y,m:view.m,d:+n.dataset.d};render()});
+}
+function renderEditor(){
+  const n=get(sel.y,sel.m,sel.d)||{t:"",y:true};
+  const e=document.getElementById("editor");
+  const ds=`${sel.y}${p2(sel.m+1)}${p2(sel.d)}`;
+  const end=new Date(Date.UTC(sel.y,sel.m,sel.d+1)).toISOString().slice(0,10).replace(/-/g,"");
+  const link="https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("🎂 "+(n.t.split("\n")[0]||"День рождения"))+"&dates="+ds+"/"+end+"&recur="+encodeURIComponent("RRULE:FREQ=YEARLY");
+  e.innerHTML=`<b>${sel.d} ${MG[sel.m]} ${sel.y}</b>
+  <textarea id="txt" placeholder="Например: День рождения Ивана">${esc(n.t)}</textarea>
+  <label><input type="checkbox" id="yr" ${n.y?"checked":""}> Повторять каждый год</label>
+  <div class="row"><button class="pri" id="save">Сохранить</button><button id="del">Удалить</button></div>
+  ${n.t?`<div class="row" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="${link}">🔔 Напоминание в Google Календарь</a></div>`:""}
+  <p class="hint">Чтобы телефон напоминал, даже когда страница закрыта, добавь дату в Google Календарь кнопкой выше: событие будет повторяться каждый год.</p>`;
+  const clear=()=>{delete notes[full(sel.y,sel.m,sel.d)];delete notes[md(sel.m,sel.d)]};
+  document.getElementById("save").onclick=()=>{
+    const t=document.getElementById("txt").value.trim(), y=document.getElementById("yr").checked;
+    clear();
+    if(t)notes[y?md(sel.m,sel.d):full(sel.y,sel.m,sel.d)]={t,y};
+    persist();render();
+  };
+  document.getElementById("del").onclick=()=>{clear();persist();render()};
+}
+function render(){renderBanner();renderGrid();renderEditor()}
+document.getElementById("prev").onclick=()=>{view.m--;if(view.m<0){view.m=11;view.y--}renderGrid()};
+document.getElementById("next").onclick=()=>{view.m++;if(view.m>11){view.m=0;view.y++}renderGrid()};
+const bk=document.getElementById("bk"),msg=document.getElementById("bkmsg");
+document.getElementById("exp").onclick=()=>{
+  bk.value=JSON.stringify(notes);bk.select();
+  let ok=false;try{ok=document.execCommand("copy")}catch(e){}
+  msg.textContent=ok?"Скопировано. Вставь текст в «Заметки» или отправь себе в мессенджер.":"Выдели текст в поле и скопируй его вручную.";
+};
+document.getElementById("imp").onclick=()=>{
+  try{
+    const data=JSON.parse(bk.value.trim());let n=0;
+    for(const k in data){if(/^(\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/.test(k)&&data[k]&&typeof data[k].t==="string"){notes[k]={t:data[k].t,y:!!data[k].y};n++}}
+    persist();render();msg.textContent="Импортировано записей: "+n+".";
+  }catch(e){msg.textContent="Не получилось прочитать текст. Вставь его целиком, как скопировал."}
+};
+render();
+</script>
+</body>
+</html>
