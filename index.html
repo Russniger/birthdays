@@ -39,9 +39,12 @@ input[type=number]{width:110px;padding:8px}
 label{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row>*{flex:1}
-.ent{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--bd)}
+.ent{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 0;border-top:1px solid var(--bd)}
+.ent>.who{flex:1 1 100%;min-width:0}
+.ent>.who>span{min-width:0;overflow-wrap:anywhere}
 .ag{color:var(--ac);font-weight:700}
-.acts{white-space:nowrap}
+.acts{flex:1 1 100%;display:flex;justify-content:flex-end;gap:6px}
+.acts .mini{margin-left:0}
 .mini{padding:4px 8px;font-size:16px;margin-left:4px}
 a.mini{display:inline-block;text-decoration:none;color:var(--tx);border:1px solid var(--bd);border-radius:12px;background:var(--card)}
 .hint{color:var(--mu);font-size:13px;margin:8px 0 0}
@@ -160,7 +163,7 @@ function renderEditor(){
   <label><input type="checkbox" id="yr" ${yearly?"checked":""}> Повторять каждый год</label>
   <div class="row"><button class="pri" id="save">${cur?"Сохранить":"Добавить"}</button>${cur?'<button id="cancel">Отмена</button>':""}</div>
   ${L.length?'<button id="icsday" style="width:100%;margin-top:8px">📅 Этот день в календарь (.ics)</button>':""}
-  <p class="hint">Можно добавить несколько человек на один день. 📱 скачивает файл для календаря телефона (.ics), 🔔 открывает Google Календарь, а «.ics» подходит для любого календаря.</p>`;
+  <p class="hint">Можно добавить несколько человек на один день. 📱 передаёт файл календарю телефона (.ics), 🔔 открывает Google Календарь, а «.ics» подходит для любого календаря.</p>`;
   document.getElementById("save").onclick=()=>{
     const t=document.getElementById("txt").value.trim(); if(!t)return;
     const b=parseInt(document.getElementById("by").value)||0;
@@ -188,7 +191,7 @@ function renderEditor(){
     else{drop(r.k,r.i);edit=null;persist();render()}
   });
 }
-function phoneCal(r){downloadIcs([[r.k,r.e,r.i]])}
+function phoneCal(r){downloadIcs([[r.k,r.e,r.i]],true)}
 function cropper(img,done){
   const S=240,W=img.naturalWidth,H=img.naturalHeight,base=S/Math.min(W,H);
   let z=1,ox=(S-W*base)/2,oy=H>W?-(H*base-S)*0.25:(S-H*base)/2;
@@ -224,13 +227,17 @@ function icsEvent(k,e,i){
   const s=("🎂 "+e.t).replace(/[\\;,]/g,c=>"\\"+c);
   return ["BEGIN:VEVENT",`UID:bd-${k}-${i}@birthdays`,`DTSTAMP:${ds}T000000Z`,`DTSTART;VALUE=DATE:${ds}`,`DTEND;VALUE=DATE:${en}`,k.length===5?"RRULE:FREQ=YEARLY":"","SUMMARY:"+s,"BEGIN:VALARM","TRIGGER:PT9H","ACTION:DISPLAY","DESCRIPTION:"+s,"END:VALARM","END:VEVENT"].filter(Boolean);
 }
-function downloadIcs(items){
+function downloadIcs(items,share){
   const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Birthdays//RU"];
   items.forEach(([k,e,i])=>L.push(...icsEvent(k,e,i)));
   L.push("END:VCALENDAR");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([L.join("\r\n")],{type:"text/calendar"}));
-  a.download="birthdays.ics";document.body.appendChild(a);a.click();a.remove();
+  const blob=new Blob([L.join("\r\n")],{type:"text/calendar"});
+  const save=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="birthdays.ics";document.body.appendChild(a);a.click();a.remove()};
+  if(share&&navigator.canShare&&navigator.share){
+    const f=new File([blob],"birthdays.ics",{type:"text/calendar"});
+    if(navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(e=>{if(e.name!=="AbortError")save()});return}
+  }
+  save();
 }
 document.getElementById("icsall").onclick=()=>{
   const items=[];for(const k in notes)notes[k].forEach((e,i)=>items.push([k,e,i]));
