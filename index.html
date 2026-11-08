@@ -37,11 +37,13 @@ label{display:flex;gap:8px;align-items:center;margin-bottom:10px}
 .row>*{flex:1}
 a.btn{display:block;text-align:center;text-decoration:none;color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
 .hint{color:var(--mu);font-size:13px;margin:8px 0 0}
+.top{display:flex;align-items:center;justify-content:space-between}
+.top button{padding:6px 12px;font-size:18px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎂 Дни рождения</h1>
+  <div class="top"><h1>🎂 Дни рождения</h1><button id="theme" aria-label="Сменить тему">🌓</button></div>
   <div id="banner"></div>
   <div class="card">
     <div class="nav"><button id="prev">‹</button><b id="title"></b><button id="next">›</button></div>
@@ -52,6 +54,7 @@ a.btn{display:block;text-align:center;text-decoration:none;color:var(--tx);borde
     <b>Резервная копия</b>
     <textarea id="bk" placeholder="Здесь появится текст копии. Для импорта вставь его сюда."></textarea>
     <div class="row"><button id="exp">Экспорт</button><button id="imp">Импорт</button></div>
+    <button id="icsall" style="width:100%;margin-top:8px">📅 Все заметки в календарь (.ics)</button>
     <p class="hint" id="bkmsg">Экспорт копирует все заметки текстом: сохрани его в «Заметки» или отправь себе. Импорт добавляет заметки из вставленного текста.</p>
   </div>
 </div>
@@ -120,8 +123,8 @@ function renderEditor(){
   <textarea id="txt" placeholder="Например: День рождения Ивана">${esc(n.t)}</textarea>
   <label><input type="checkbox" id="yr" ${n.y?"checked":""}> Повторять каждый год</label>
   <div class="row"><button class="pri" id="save">Сохранить</button><button id="del">Удалить</button></div>
-  ${n.t?`<div class="row" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="${link}">🔔 Напоминание в Google Календарь</a></div>`:""}
-  <p class="hint">Чтобы телефон напоминал, даже когда страница закрыта, добавь дату в Google Календарь кнопкой выше: событие будет повторяться каждый год.</p>`;
+  ${n.t?`<div class="row" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="${link}">🔔 Google Календарь</a><button id="ics">📅 Другой календарь (.ics)</button></div>`:""}
+  <p class="hint">Чтобы телефон напоминал, даже когда страница закрыта, добавь дату в календарь. Кнопка «.ics» скачивает файл, который открывается в любом календаре (Samsung, Apple, Outlook, Яндекс и др.). Событие повторяется каждый год, напоминание в 9:00.</p>`;
   const clear=()=>{delete notes[full(sel.y,sel.m,sel.d)];delete notes[md(sel.m,sel.d)]};
   document.getElementById("save").onclick=()=>{
     const t=document.getElementById("txt").value.trim(), y=document.getElementById("yr").checked;
@@ -130,10 +133,39 @@ function renderEditor(){
     persist();render();
   };
   document.getElementById("del").onclick=()=>{clear();persist();render()};
+  const ib=document.getElementById("ics");
+  if(ib)ib.onclick=()=>{const f=full(sel.y,sel.m,sel.d);downloadIcs([notes[f]?f:md(sel.m,sel.d)])};
 }
 function render(){renderBanner();renderGrid();renderEditor()}
 document.getElementById("prev").onclick=()=>{view.m--;if(view.m<0){view.m=11;view.y--}renderGrid()};
 document.getElementById("next").onclick=()=>{view.m++;if(view.m>11){view.m=0;view.y++}renderGrid()};
+function icsEvent(k,v){
+  let y,m,d;
+  if(k.length===5){y=today.y;m=+k.slice(0,2)-1;d=+k.slice(3)}else{y=+k.slice(0,4);m=+k.slice(5,7)-1;d=+k.slice(8)}
+  const ds=`${y}${p2(m+1)}${p2(d)}`;
+  const en=new Date(Date.UTC(y,m,d+1)).toISOString().slice(0,10).replace(/-/g,"");
+  const s=("🎂 "+v.t.split("\n")[0]).replace(/[\\;,]/g,c=>"\\"+c);
+  return ["BEGIN:VEVENT",`UID:bd-${k}@birthdays`,`DTSTAMP:${ds}T000000Z`,`DTSTART;VALUE=DATE:${ds}`,`DTEND;VALUE=DATE:${en}`,v.y?"RRULE:FREQ=YEARLY":"","SUMMARY:"+s,"BEGIN:VALARM","TRIGGER:PT9H","ACTION:DISPLAY","DESCRIPTION:"+s,"END:VALARM","END:VEVENT"].filter(Boolean);
+}
+function downloadIcs(keys){
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Birthdays//RU"];
+  keys.forEach(k=>L.push(...icsEvent(k,notes[k])));
+  L.push("END:VCALENDAR");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([L.join("\r\n")],{type:"text/calendar"}));
+  a.download="birthdays.ics";document.body.appendChild(a);a.click();a.remove();
+}
+document.getElementById("icsall").onclick=()=>{
+  const ks=Object.keys(notes);
+  if(ks.length)downloadIcs(ks);
+};
+const root=document.documentElement;
+try{const t=localStorage.getItem("bd-theme");if(t)root.dataset.theme=t}catch(e){}
+document.getElementById("theme").onclick=()=>{
+  const cur=root.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  const nx=cur==="dark"?"light":"dark";root.dataset.theme=nx;
+  try{localStorage.setItem("bd-theme",nx)}catch(e){}
+};
 const bk=document.getElementById("bk"),msg=document.getElementById("bkmsg");
 document.getElementById("exp").onclick=()=>{
   bk.value=JSON.stringify(notes);bk.select();
